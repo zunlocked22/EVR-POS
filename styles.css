@@ -1,0 +1,106 @@
+:root { --green:#27ae60; --blue:#2980b9; --bg:#f6f8f7; --text:#222; --gray:#ccc; }
+body{ font-family:system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--text); padding:16px; }
+.pos-box{ background:#fff; border:1px solid #e8e8e8; border-radius:10px; box-shadow:0 3px 10px rgba(0,0,0,.06); padding:16px; }
+h1{ font-size:1.4rem; text-align:center; margin:0 0 16px; }
+table{ font-size:.95rem; }
+.right{text-align:right}
+td[contenteditable]{background:#fffef0}
+#receipt{display:none}
+#subtotalDisplay,#discountDisplay,#totalDisplay,#change{ font-weight:700; }
+.stat{ font-size:1.05rem; }
+/* ensure receipt never overlays */
+#receipt{ display:none !important; position:static !important; }
+/* ---------- Tidy Transaction History Table ---------- */
+/* Ensure table keeps columns stable and rows top-aligned */
+#historyBody td, #historyBody th { vertical-align: top; padding: 6px 8px; }
+
+/* ---------- Fix History modal layout ---------- */
+#historyModal .table-responsive { overflow: auto; } /* allow horizontal scroll if necessary */
+
+#historyModal .table { table-layout: fixed; width:100%; }
+
+/* Columns: control sizes and wrapping */
+#historyModal th, #historyModal td { vertical-align: top; padding:6px 8px; }
+
+/* Invoice / Date / Customer narrow columns */
+#historyModal th:nth-child(1), #historyModal td:nth-child(1) { width:120px; }
+#historyModal th:nth-child(2), #historyModal td:nth-child(2) { width:150px; }
+#historyModal th:nth-child(3), #historyModal td:nth-child(3) { width:150px; }
+
+/* Items column: allow wrapping but limit visible height */
+#historyModal th:nth-child(4), #historyModal td:nth-child(4) {
+  width:40%;
+  min-width:220px;
+}
+.history-items-preview {
+  display:block;
+  max-height: 3.0em;   /* ~2 lines */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  line-height:1.4em;
+  word-break: break-word;
+}
+
+/* Numeric columns (tight, right aligned) */
+#historyModal th:nth-child(5), #historyModal td:nth-child(5),
+#historyModal th:nth-child(8), #historyModal td:nth-child(8),
+#historyModal th:nth-child(9), #historyModal td:nth-child(9),
+#historyModal th:nth-child(10), #historyModal td:nth-child(10) {
+  width:90px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Payment/ref columns */
+#historyModal th:nth-child(6), #historyModal td:nth-child(6),
+#historyModal th:nth-child(7), #historyModal td:nth-child(7) {
+  width:120px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Action column: fixed width, buttons stacked or in a compact group */
+#historyModal th:last-child, #historyModal td:last-child {
+  width:170px;
+  text-align:right;
+  white-space:nowrap;
+  padding-right:12px;
+}
+
+/* compact action buttons layout */
+.history-actions { display:flex; gap:6px; justify-content:flex-end; align-items:center; flex-wrap:nowrap; }
+.history-actions .btn { white-space:nowrap; font-size:0.85rem; padding:4px 6px; }
+
+/* make long reason/ref text truncated */
+.truncate-1line { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px; display:inline-block; vertical-align:middle; }
+
+/* responsive adjustments for small screens */
+@media (max-width:900px){
+  #historyModal th:nth-child(4), #historyModal td:nth-child(4) { width: 36%; }
+  #historyModal th:last-child, #historyModal td:last-child { width: 140px; }
+}
+/* compact history action buttons + table safety */
+.history-actions { display:flex; gap:8px; justify-content:flex-end; align-items:center; flex-wrap:nowrap; }
+.act-btn {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:36px;
+  height:36px;
+  padding:0;
+  border-radius:8px;
+  font-size:16px;
+  line-height:1;
+}
+#historyModal td.truncate-1line, #historyModal td.truncate-1line * {
+  max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.history-items-preview { display:block; max-height:3.0em; overflow:hidden; white-space:normal; line-height:1.4em; word-break:break-word; }
+#historyModal .table { table-layout: fixed; width:100%; }
+.action-cell {
+  text-align: center !important;  /* or center kung gusto mo */
+}
+
+
