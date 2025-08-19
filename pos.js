@@ -294,10 +294,6 @@ function renderHistory(){
     // safe invoice used for data attribute
     const invoiceSafe = (t.invoice || '').replace(/"/g,'&quot;').replace(/'/g,"&#39;");
 
-    // build preview HTML: truncated preview + optional "+N more" button
-    const previewHtml = `<span class="history-items-preview">${escapeHtml(previewList || '(no items)')}</span>`
-      + (moreCount > 0 ? ` <button type="button" class="btn btn-link btn-sm view-items-btn" data-invoice="${invoiceSafe}" data-idx="${idx}">+${moreCount} more</button>` : '');
-
     // build a single TR with exactly the same number of TDs as header
     const rowHtml = `
   <tr>
@@ -539,6 +535,7 @@ function openBrandInHistory(brand){
 }
 
 // ====== PRODUCTS / MANAGE PRODUCTS UI ======
+// (first version gets replaced later by improved version — OK lang, last definition wins)
 function renderProductsTable() {
   const tbody = document.getElementById('productsBody');
   if (!tbody) return;
@@ -582,8 +579,40 @@ function openProductsModal(prefillCode = '') {
   else { modalEl.classList.add('show'); modalEl.style.display = 'block'; }
 }
 
+// --- Simple Delete for Manage Products (legacy; will be overridden by final deleteProduct below) ---
+(function () {
+  if (window._simpleDeleteAttached) return;
+  window._simpleDeleteAttached = true;
 
-let currentEditCode = null; // ilagay ito sa taas ng section kung wala pa
+  window.deleteProduct = function (code) {
+    const db = window.productDB || {};
+    const name = (db[code] && db[code].name) || '';
+    const msg = name
+      ? `Are you sure you want to delete "${name}" (code: ${code})?`
+      : `Are you sure you want to delete product ${code}?`;
+
+    if (!confirm(msg)) return;
+
+    delete db[code];
+    if (window.localStorage) {
+      localStorage.setItem('productDB', JSON.stringify(db)); // (legacy; final override fixes storage key)
+    }
+    if (typeof renderProductsTable === 'function') renderProductsTable();
+  };
+
+  document.addEventListener('click', function (e) {
+    const delBtn = e.target.closest('.action-delete');
+    if (delBtn) {
+      const code = delBtn.dataset.code || delBtn.getAttribute('data-code');
+      if (code) {
+        window.deleteProduct(code);
+      }
+    }
+  });
+})();
+
+
+let currentEditCode = null;
 
 function addOrUpdateProduct(){
   const codeEl = document.getElementById('prodBarcode'); 
@@ -612,14 +641,12 @@ function addOrUpdateProduct(){
     alert('Product added');
   }
 
-  // clear form (para ready ulit sa bagong input)
   codeEl.value = ''; 
   nameEl.value = ''; 
   brandEl.value = ''; 
   priceEl.value = ''; 
   stockEl.value = '';
 
-  // ✅ Cleanup lang ng backdrop para hindi ma-blackout ang screen
   document.body.classList.remove('modal-open');
   document.body.style.removeProperty('padding-right');
   const backdrops = document.querySelectorAll('.modal-backdrop');
@@ -656,7 +683,6 @@ function saveEditedProduct(){
 
   bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
 }
-
 
 // ====== EDIT QTY MODAL ======
 function openEditQty(index){
@@ -712,8 +738,6 @@ function showAdminModal(action, payload){
   if(window.bootstrap){ new bootstrap.Modal(el).show(); }
   else { el.classList.add('show'); el.style.display='block'; }
 }
-
-// We'll attach a single admin confirm handler later (after UI exists)
 
 // helper to delete history item (kept but not exposed in UI)
 function deleteHistoryConfirmed(index){
@@ -1109,14 +1133,96 @@ function openItemsModalByInvoice(invoice, idxFallback){
   });
 })();
 
-// ====== CART AUTOSAVE (hooks on actions) ======
-function saveCartToStorage(){ try{ SafeLS.setItem('evr_cart', JSON.stringify(cart)); }catch(e){ console.warn('saveCartToStorage failed', e); } }
-function loadCartFromStorage(){ try{ const raw = SafeLS.getItem('evr_cart'); if(!raw) return; const arr = JSON.parse(raw); if(Array.isArray(arr)) { cart = arr; } }catch(e){ console.warn('loadCartFromStorage failed', e); } }
+// ====== Improved Products Modal + Search (overrides earlier minimal one) ======
+function openProductsModal(prefillCode = '') {
+  const barcodeField = document.getElementById('prodBarcode');
+  if (barcodeField) barcodeField.value = prefillCode || '';
+  const name = document.getElementById('prodName'); if (name) name.value = '';
+  const brand = document.getElementById('prodBrand'); if (brand) brand.value = '';
+  const price = document.getElementById('prodPrice'); if (price) price.value = '';
+  const stock = document.getElementById('prodStock'); if (stock) stock.value = '';
+
+  // inject search box once
+  const tbody = document.getElementById('productsBody');
+  if (tbody) {
+    const table = tbody.closest('table');
+    const container = table ? table.parentElement : null;
+    if (container && !document.getElementById('productsSearch')) {
+      const div = document.createElement('div');
+      div.className = 'mb-2';
+      div.innerHTML = `
+        <input class="form-control" id="productsSearch" placeholder="Search products (code, name, brand)…">
+      `;
+      container.insertBefore(div, table);
+
+      const searchEl = div.querySelector('#productsSearch');
+      searchEl.addEventListener('input', renderProductsTable);
+      searchEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          searchEl.value = '';
+          renderProductsTable();
+        }
+      });
+    }
+  }
+
+  renderProductsTable();
+
+  const modalEl = document.getElementById('productsModal');
+  if (window.bootstrap) { new bootstrap.Modal(modalEl).show(); }
+  else { modalEl.classList.add('show'); modalEl.style.display = 'block'; }
+
+  const s = document.getElementById('productsSearch');
+  if (s) setTimeout(() => s.focus(), 150);
+}
+
+function renderProductsTable() {
+  const tbody = document.getElementById('productsBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const q = (document.getElementById('productsSearch')?.value || '').toLowerCase().trim();
+
+  const codes = Object.keys(productDB).sort((a, b) => {
+    const na = Number(a), nb = Number(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return String(a).localeCompare(String(b));
+  });
+
+  if (codes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No products registered</td></tr>';
+    return;
+  }
+
+  let count = 0;
+  for (const code of codes) {
+    const p = productDB[code];
+    const hay = `${code} ${p?.name || ''} ${p?.brand || ''}`.toLowerCase();
+    if (q && !hay.includes(q)) continue;
+
+    tbody.insertAdjacentHTML('beforeend', `
+      <tr>
+        <td>${escapeHtml(code)}</td>
+        <td>${escapeHtml(p.name)}</td>
+        <td>${escapeHtml(p.brand || '')}</td>
+        <td class="right">${Number(p.price).toFixed(2)}</td>
+        <td class="right">${Number(p.stock).toFixed(0)}</td>
+        <td>
+          <button class="btn btn-sm btn-warning" onclick="editProduct('${code}')">✏️</button>
+          <button class="btn btn-sm btn-danger ms-1" onclick="deleteProduct('${code}')">🗑️</button>
+        </td>
+      </tr>
+    `);
+    count++;
+  }
+
+  if (count === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No results</td></tr>';
+  }
+}
+
+// ====== CART AUTOSAVE hook on unload ======
 window.addEventListener('beforeunload', function(){ try{ SafeLS.setItem('evr_cart', JSON.stringify(cart)); }catch(e){} });
-
-// ensure save on cart mutations (we call saveCartToStorage manually inside mutating functions)
-
-// ====== download helper for products (already added) ======
 
 // ====== Utility: trim history (safety) ======
 function trimHistoryIfNeeded(arr, max=5000){
@@ -1124,5 +1230,27 @@ function trimHistoryIfNeeded(arr, max=5000){
   if(arr.length <= max) return arr;
   return arr.slice(Math.max(0, arr.length - max));
 }
+
+// (legacy wrong deleteProduct kept above; final one below fixes storage key and refresh)
+// (legacy wrong delete using "products" + renderProducts() kept in original source — overridden)
+
+// ====== ✅ FINAL OVERRIDE: Delete Product (correct storage + refresh) ======
+window.deleteProduct = function (code) {
+  if (!code) return;
+  const p = productDB[code];
+  const label = p ? `"${p.name}" (code: ${code})` : `product ${code}`;
+  if (!confirm(`Are you sure you want to delete ${label}?`)) return;
+
+  // remove from in-memory DB
+  delete productDB[code];
+
+  // persist to same storage used by the app
+  saveProductsToStorage();
+
+  // refresh Manage Products table
+  if (typeof renderProductsTable === 'function') renderProductsTable();
+
+  alert('Product deleted successfully!');
+};
 
 // ====== End of file ------------------------------------------------------
